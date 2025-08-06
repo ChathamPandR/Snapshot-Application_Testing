@@ -1,55 +1,107 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=1440, initial-scale=1.0" />
-  <title>Environmental Snapshot</title>
-</head>
-<body style="background-color: #f0f0f0; color: #000; font-family: Arial, sans-serif; margin: 0; padding: 0; width: 1440px; height: 2560px; -webkit-text-size-adjust: none;">
+import requests
+from datetime import datetime
+import pytz
 
-<!-- Header -->
-<div id="header" style="background-color: black; color: white; padding: 32px 20px; text-align: center; font-size: 64px; font-weight: 900;">
-  US 64 Haw River Access<br>
-  <div style="font-size: 36px; font-weight: 400;">348 River Access Rd | 35.77659 / -79.14597</div>
-</div>
+# Config
+latitude, longitude = 35.7202, -79.1772
+usgs_site = "02096960"
+nws_zone = "NCZ041"
+swimguide_url = "https://www.theswimguide.org/api/locations?region=haw-river-assembly"
 
-<div class="container" style="padding: 32px; display: flex; flex-direction: column; gap: 28px;">
+# Load template
+with open("index.html", "r", encoding="utf-8") as f:
+    html = f.read()
 
-  <!-- Alerts Section -->
-  <div class="section centered" id="alerts-section" style="border: 4px solid #000; padding: 16px; background-color: #fff;">
-    <div class="card-title" style="font-size: 36px; font-weight: bold; background-color: #000; color: #fff; padding: 4px 8px; margin-bottom: 8px;">Alerts</div>
-    <div style="font-size: 48px; font-weight: bold; text-align: center;">Heat Advisory; Heat Advisory</div>
-    <div class="card-timestamp" style="font-size: 24px; color: #222; margin-top: 8px;">Last updated: Jul 29, 2025, 5:23 PM</div>
-  </div>
+# Timestamp in Eastern Time
+now = datetime.now(pytz.timezone("US/Eastern"))
+timestamp = now.strftime("%b %d, %Y, %I:%M %p")
 
-  <!-- Weather Section -->
-  <div class="section centered" id="weather-section" style="border: 4px solid #000; padding: 16px; background-color: #fff;">
-    <div class="card-title" style="font-size: 36px; font-weight: bold; background-color: #000; color: #fff; padding: 4px 8px; margin-bottom: 8px;">Weather Conditions</div>
-    <div style="font-size: 100px; font-weight: bold; text-align: center;">34.3°F</div>
-    <div class="card-timestamp" style="font-size: 24px; color: #222; margin-top: 8px;">Last updated: Jul 29, 2025, 5:23 PM</div>
-  </div>
+# Weather (Open-Meteo current_weather)
+weather = "N/A"
+try:
+    r = requests.get("https://api.open-meteo.com/v1/forecast",
+                     params={
+                         "latitude": latitude,
+                         "longitude": longitude,
+                         "current_weather": "true",
+                         "timezone": "America/New_York"
+                     },
+                     timeout=10)
+    j = r.json()
+    weather = f"{j['current_weather']['temperature']}°F"
+    print("Weather:", weather)
+except Exception as e:
+    print("Weather error:", e)
 
-  <!-- River Level -->
-  <div class="section centered" id="river-section" style="border: 4px solid #000; padding: 16px; background-color: #fff;">
-    <div class="card-title" style="font-size: 36px; font-weight: bold; background-color: #000; color: #fff; padding: 4px 8px; margin-bottom: 8px;">River Level</div>
-    <div style="font-size: 100px; font-weight: bold; text-align: center;">3.56 ft</div>
-    <div class="card-timestamp" style="font-size: 24px; color: #222; margin-top: 8px;">Last updated: Jul 29, 2025, 5:23 PM</div>
-  </div>
+# USGS river
+river_level = "N/A"
+try:
+    r = requests.get(f"https://waterservices.usgs.gov/nwis/iv/?sites={usgs_site}&parameterCd=00065&format=json", timeout=10)
+    j = r.json()
+    value = j["value"]["timeSeries"][0]["values"][0]["value"][0]["value"]
+    river_level = f"{value} ft"
+    print("River:", river_level)
+except Exception as e:
+    print("River error:", e)
 
-  <!-- Air Quality -->
-  <div class="section centered" id="aqi-section" style="border: 4px solid #000; padding: 16px; background-color: #fff;">
-    <div class="card-title" style="font-size: 36px; font-weight: bold; background-color: #000; color: #fff; padding: 4px 8px; margin-bottom: 8px;">Air Quality Index</div>
-    <div style="font-size: 100px; font-weight: bold; text-align: center;">N/A</div>
-    <div class="card-timestamp" style="font-size: 24px; color: #222; margin-top: 8px;">Last updated: Jul 29, 2025, 5:23 PM</div>
-  </div>
+# Swim Guide: US 64 status
+swim_status = "N/A"
+try:
+    r = requests.get(swimguide_url, timeout=10)
+    sites = r.json()
+    us64 = next((s for s in sites if "US 64" in s.get("name", "")), None)
+    if us64:
+        c = us64.get("latest_classification", "")
+        if "safe" in c.lower():
+            swim_status = "✔️ SAFE TO SWIM"
+        elif "caution" in c.lower():
+            swim_status = "⚠️ SWIM WITH CAUTION"
+        elif "unsafe" in c.lower():
+            swim_status = "❌ UNSAFE TO SWIM"
+        else:
+            swim_status = c.capitalize()
+    print("Swim:", swim_status)
+except Exception as e:
+    print("Swim Guide error:", e)
 
-  <!-- Swim Guide: US 64 -->
-  <div class="section centered" id="swim-us64" style="border: 4px solid #000; padding: 16px; background-color: #fff;">
-    <div class="card-title" style="font-size: 36px; font-weight: bold; background-color: #000; color: #fff; padding: 4px 8px; margin-bottom: 8px;">Swim Guide: US 64 Access</div>
-    <div style="font-size: 100px; font-weight: bold; text-align: center;">N/A</div>
-    <div class="label" style="font-size: 24px; color: #444; margin-top: 8px; text-align: center;">Via Swim Guide / Haw River Assembly</div>
-  </div>
+# Alerts
+alerts = "None"
+try:
+    r = requests.get(f"https://api.weather.gov/alerts/active/zone/{nws_zone}",
+                     headers={"User-Agent": "signscript/1.0 (example@example.com)"},
+                     timeout=10)
+    j = r.json()
+    alerts = "; ".join([ev["properties"]["event"] for ev in j.get("features", [])]) or "None"
+    print("Alerts:", alerts)
+except Exception as e:
+    print("Alerts error:", e)
 
-</div>
-</body>
-</html>
+# Air Quality
+aqi = "N/A"
+try:
+    r = requests.get("https://air-quality-api.open-meteo.com/v1/air-quality",
+                     params={"latitude": latitude, "longitude": longitude, "timezone": "America/New_York"},
+                     timeout=10)
+    j = r.json()
+    val = j.get("current", {}).get("us_aqi")
+    if val is not None:
+        aqi = f"AQI: {val}"
+    print("AQI:", aqi)
+except Exception as e:
+    print("Air quality error:", e)
+
+# Replace placeholders
+html = html.replace("{{weather_temp}}", weather)
+html = html.replace("{{river_level}}", river_level)
+html = html.replace("{{swim_status_us64}}", swim_status)
+html = html.replace("{{nws_alerts}}", alerts)
+html = html.replace("{{air_quality}}", aqi)
+html = html.replace("{{last_updated}}", f"Last updated: {timestamp}")
+
+# Save snapshot
+with open("snapshot.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("✅ snapshot.html updated at", timestamp)
+
+
